@@ -8,22 +8,18 @@
     };
   };
 
-  outputs = { flake-utils, naersk, nixpkgs, ... }:
+  outputs = { self, flake-utils, naersk, nixpkgs, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = (import nixpkgs) {
-          inherit system;
-        };
-
+        pkgs = nixpkgs.legacyPackages.${system};
         naersk' = pkgs.callPackage naersk {};
-
       in {
         packages.default = naersk'.buildPackage {
-          src = ./.;
+          src = self.outPath;
         };
 
         devShell = pkgs.mkShell {
-          nativeBuildInputs = with pkgs; [ rustc cargo ];
+          nativeBuildInputs = with pkgs; [ rustc cargo openssl pkg-config ];
           packages = with pkgs; [ rust-analyzer rustfmt clippy ];
         };
       }
