@@ -23,25 +23,43 @@ Run in this repo, and try the following request:
 ) | get body | save tmp.pdf
 ```
 
+The compilation context is reused, so the speed should be comparable with `typst watch` (I think).
+Hyperfine says 2.3 ms ± 2.8 ms (meaning it's faster than the margin for error in its measurement of the shell startup time),
+and Apache's server benchmarking tool completes 1000 requests in under a second (using `ab -n 1000 -c 1000`).
+
+Configuration is done by environment variables.
+See the `Config` struct and its `Default` implementation for the variables and their defaults.
+
 ## To-do
 
-Soon
-- Error handling; confirm all panics are safe or justified.
-- Add/fix tests.
+### Soon
 
-Later
-- Default home page with form to manually submit request.
-- Endpoint to list available templates?
+In addition to the in-text notes, the following are priorities.
+
+- Error handling; confirm all panics are safe or justified.
+- Avoid unnecessary allocations.
+- Add/fix tests.
+- Investigate startup time lag.
+- NixOS module.
+
+### Later
+
+These are ideas for improvements.
+
 - Allow customisation of S3 folder structure (e.g. per date).
-- Add tracing logging?
-- Cache compilations?
-  - Possible to use incremental compilation?
-  - Re-use context per template?
 - Support document formats other than PDF.
-- Handle large files in response.
+- Refresh fonts (font library is currently only built once at startup).
+- Add tracing logging?
+- Endpoint to list available templates?
+- Handle large files in response and multipart s3 upload.
 - OT/Prometheus endpoint?
 - Authorisation?
 - Rate-limiting?
+
+
+## Credit
+
+The implementation of the compiler context and the interaction with the Typst libraries was based on [tfachmann's example code](https://github.com/tfachmann/typst-as-library/blob/main/src/lib.rs).
 
 ---
 

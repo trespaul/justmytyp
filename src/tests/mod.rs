@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use super::*;
 
 #[test]
@@ -17,8 +15,12 @@ fn test_request_deserialization() {
 }
 
 #[test]
+#[allow(clippy::unreadable_literal)]
 fn test_pdf_compile() {
     use std::hash::{DefaultHasher, Hash, Hasher};
+
+    let config = Config::init();
+    let world = World::new(config.rootdir.clone(), config.cachedir.clone());
 
     let input = r#"{
             "title": "Hello, World!",
@@ -28,21 +30,14 @@ fn test_pdf_compile() {
 
     let template = String::from("./src/tests/test.typ");
 
-    let config = Config {
-        loglevel: log::LevelFilter::Debug,
-        rootdir: PathBuf::from("./"),
-        cachedir: PathBuf::from("./.cache"),
-        timeout: 10,
-        bindaddress: String::from("0.0.0.0:3000"),
-        timestampformat: "".to_string(),
-        s3: None,
-    };
-
-    let compiled = pdf::compile(template, input, &config);
+    let compiled = pdf::compile(&world, template, input);
 
     let mut hasher = DefaultHasher::new();
     compiled.hash(&mut hasher);
 
-    // TODO: this isn't deterministic probably
-    assert_eq!(hasher.finish(), 8938572378811411970);
+    // TODO: this isn't deterministic probably?
+    assert_eq!(
+        hasher.finish(),
+        8938572378811411970
+    );
 }

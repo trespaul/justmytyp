@@ -1,12 +1,10 @@
-use std::{path::PathBuf, sync::OnceLock};
+use std::path::PathBuf;
 
 use figment::{
     Figment,
     providers::{Env, Serialized},
 };
 use serde::{Deserialize, Serialize};
-
-static CONFIG: OnceLock<Config> = OnceLock::new();
 
 /// The main configuration struct. See the impl for Default for default values.
 #[derive(Debug, Serialize, Deserialize)]
@@ -55,26 +53,14 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn init() -> Result<(), String> {
+    pub fn init() -> Self {
         let default = Figment::new().merge(Serialized::defaults(Config::default()));
 
         let with_env = default.clone().merge(Env::prefixed("TYP_").split("_"));
 
-        match with_env.extract::<Config>() {
-            Ok(c) => {
-                CONFIG.set(c).expect("Tried to set config twice.");
-                Ok(())
-            }
-            Err(e) => {
-                let c = default.extract::<Config>().unwrap();
-                CONFIG.set(c).expect("Tried to set config twice.");
-                Err(e.to_string())
-            }
-        }
-    }
-
-    pub fn get() -> &'static Config {
-        // MAYBE: I think expect is fine here; way to ensure? as long as init() is the first thing in main()?
-        CONFIG.get().expect("Settings are not initialised.")
+        with_env.extract::<Config>().unwrap_or_else(|e| {
+            log::warn!("Failed to load config: {e}; using defaults.");
+            default.extract::<Config>().unwrap()
+        })
     }
 }

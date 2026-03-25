@@ -1,28 +1,24 @@
-mod context;
+pub mod context;
+pub mod world;
 
-use context::CompileContext;
+use context::Context;
 use typst::{diag::SourceDiagnostic, ecow::EcoVec};
 use typst_pdf::{PdfOptions, pdf};
 
-use crate::config::Config;
+use crate::pdf::world::World;
 
 pub fn compile(
+    world: &World,
     template: String,
     input: String,
-    config: &Config
 ) -> Result<Vec<u8>, EcoVec<SourceDiagnostic>> {
-    let context = CompileContext::new(
+    let context = Context {
+        world,
         template,
-        config.rootdir.clone(),
-        config.cachedir.clone(),
-    );
+        input,
+    };
 
-    context.insert_file("/input.json".to_string(), input);
-
-    typst::compile(&context)
-        .output
-        .and_then(|d|
-            // TODO: allow setting PDF standard
-            pdf(&d, &PdfOptions::default())
-        )
+    typst::compile(&context).output.and_then(|d|
+        // TODO: allow setting PDF standard
+        pdf(&d, &PdfOptions::default()))
 }

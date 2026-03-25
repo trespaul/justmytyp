@@ -1,19 +1,21 @@
 use axum::{
     Json, Router,
+    extract::State,
     http::{StatusCode, header},
     response::{IntoResponse, Redirect, Response},
     routing::post,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
-use std::time::Duration;
+use time::format_description::{self, well_known::Rfc3339};
+use std::{sync::Arc, time::Duration};
 use tokio::signal;
 use tower::ServiceBuilder;
 use tower_http::{
     compression::CompressionLayer, decompression::RequestDecompressionLayer, timeout::TimeoutLayer,
 };
 
-use crate::{config::Config, upload::upload};
+use crate::{config::Config, pdf::world::World, upload::upload};
 
 mod config;
 mod pdf;
@@ -22,22 +24,29 @@ mod upload;
 #[cfg(test)]
 mod tests;
 
+struct AppState {
+    config: Config,
+    world: World,
+}
+
 #[tokio::main]
 async fn main() {
-    let config_result = Config::init();
+    let config = Config::init();
+
+    let state = Arc::new(AppState {
+        world: World::new(config.rootdir.clone(), config.cachedir.clone()),
+        config,
+    });
 
     env_logger::Builder::new()
-        .filter_level(Config::get().loglevel)
+        .filter_level(state.config.loglevel)
         .init();
 
-    if let Err(e) = config_result {
-        log::warn!("Failed to load config: {e}; using defaults.");
-    };
-
-    log::debug!("Loaded config: {:#?}", Config::get());
+    log::debug!("Loaded config: {:#?}", state.config);
 
     let app = Router::new()
         .route("/", post(handler))
+        .with_state(state.clone())
         .fallback(Redirect::to("/"))
         .layer(
             ServiceBuilder::new()
@@ -46,38 +55,44 @@ async fn main() {
         )
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
-            Duration::from_secs(Config::get().timeout),
+            Duration::from_secs(state.config.timeout),
         ));
 
-    let listener = tokio::net::TcpListener::bind(&Config::get().bindaddress).await;
+    let listener = tokio::net::TcpListener::bind(&state.config.bindaddress).await;
 
     match listener {
         Ok(r) => {
-            log::info!("Listening on {}.", Config::get().bindaddress);
+            log::info!("Listening on {}.", &state.config.bindaddress);
             axum::serve(r, app)
                 .with_graceful_shutdown(shutdown_signal())
                 .await
                 .unwrap();
         }
         Err(e) => {
-            log::error!("Failed to bind TCP listener: {e}");
+            log::error!(
+                "Failed to bind TCP listener on {}: {}",
+                state.config.bindaddress,
+                e
+            );
             return;
         }
-    };
+    }
 }
 
-async fn handler(Json(body): Json<RequestMessage>) -> impl IntoResponse {
+async fn handler(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<RequestMessage>,
+) -> impl IntoResponse {
     log::info!("Incoming request.");
-    log::debug!("Request body: {:#?}", body);
+    log::debug!("Request body: {body:#?}");
 
-    let config = Config::get();
+    let compiled = pdf::compile(&state.world, body.template, body.input.to_string());
 
-    let compiled = pdf::compile(body.template, body.input.to_string(), config);
-
+    #[allow(clippy::single_match_else)]
     match compiled {
-        Ok(document) => match &config.s3 {
+        Ok(document) => match &state.config.s3 {
             Some(c) => {
-                let upload_result = upload(c, body.name.clone(), document).await;
+                let upload_result = upload(c, &make_filename(&body.name, &state.config.timestampformat), document).await;
 
                 let response = match upload_result {
                     Ok(url) => {
@@ -91,7 +106,7 @@ async fn handler(Json(body): Json<RequestMessage>) -> impl IntoResponse {
                         )
                     }
                 };
-                log::debug!("Responding with: {:#?}", response);
+                log::debug!("Responding with: {response:#?}");
 
                 response
             }
@@ -138,7 +153,6 @@ impl IntoResponse for AppResult {
                     body,
                 )
                     .into_response(),
-                // (StatusCode::CREATED, Json(m)).into_response()
             },
             AppResult::Error(m) => (StatusCode::INTERNAL_SERVER_ERROR, Json(m)).into_response(),
         }
@@ -171,7 +185,24 @@ async fn shutdown_signal() {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
+        () = ctrl_c => {},
+        () = terminate => {},
     }
+}
+
+fn make_filename(name: &str, timestampformat: &str) -> String {
+    let now = time::UtcDateTime::now();
+
+    // TODO: parse in config init already; use actual default string, not RFC 3339, or make it the actual default.
+    let parsed = format_description::parse(timestampformat);
+
+    let timestamp = match parsed {
+        Ok(f) => now.format(&f).unwrap(),
+        Err(e) => {
+            log::warn!("Unable to parse format string: {e} — using RFC 3339 format.");
+            now.format(&Rfc3339).unwrap()
+        }
+    };
+
+    format!("{timestamp}-{name}.pdf")
 }

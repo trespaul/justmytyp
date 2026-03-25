@@ -23,3 +23,16 @@ typst-kit = { version = "0.14.2", features = ["embed-fonts"] }
 typst-pdf = "0.14.2"
 ureq = "3.2.0"
 zune-inflate = { version = "0.2.54", default-features = false, features = ["gzip", "std"] }
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+panic = "abort"
+
+[profile.dev]
+debug = "line-tables-only"
+
+[lints.clippy]
+all = "deny"
+pedantic = "warn"
+style = "warn"
