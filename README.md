@@ -36,7 +36,6 @@ See the `Config` struct and its `Default` implementation for the variables and t
 
 In addition to the in-text notes, the following are priorities.
 
-- Error handling; confirm all panics are safe or justified.
 - Avoid unnecessary allocations.
 - Add/fix tests.
 - Investigate startup time lag.
