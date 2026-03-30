@@ -7,7 +7,6 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
-use time::format_description::{self, well_known::Rfc3339};
 use std::{sync::Arc, time::Duration};
 use tokio::signal;
 use tower::ServiceBuilder;
@@ -32,11 +31,9 @@ struct AppState {
 #[tokio::main]
 async fn main() {
     let config = Config::init();
+    let world = World::new(config.rootdir.clone(), config.cachedir.clone());
 
-    let state = Arc::new(AppState {
-        world: World::new(config.rootdir.clone(), config.cachedir.clone()),
-        config,
-    });
+    let state = Arc::new(AppState { config, world });
 
     env_logger::Builder::new()
         .filter_level(state.config.loglevel)
@@ -92,7 +89,7 @@ async fn handler(
     match compiled {
         Ok(document) => match &state.config.s3 {
             Some(c) => {
-                let upload_result = upload(c, &make_filename(&body.name, &state.config.timestampformat), document).await;
+                let upload_result = upload(c, &make_filename(&body.name, &state), document).await;
 
                 let response = match upload_result {
                     Ok(url) => {
@@ -190,19 +187,16 @@ async fn shutdown_signal() {
     }
 }
 
-fn make_filename(name: &str, timestampformat: &str) -> String {
+fn make_filename(name: &str, state: &Arc<AppState>) -> String {
+    let timestampformat = state
+        .config
+        .timestampformat_parsed
+        .as_ref()
+        .expect("BUG: could not unwrap timestamp.");
+
     let now = time::UtcDateTime::now();
 
-    // TODO: parse in config init already; use actual default string, not RFC 3339, or make it the actual default.
-    let parsed = format_description::parse(timestampformat);
-
-    let timestamp = match parsed {
-        Ok(f) => now.format(&f).unwrap(),
-        Err(e) => {
-            log::warn!("Unable to parse format string: {e} — using RFC 3339 format.");
-            now.format(&Rfc3339).unwrap()
-        }
-    };
+    let timestamp = now.format(timestampformat).unwrap();
 
     format!("{timestamp}-{name}.pdf")
 }

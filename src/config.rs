@@ -6,6 +6,7 @@ use figment::{
 };
 use s3::Credentials;
 use serde::{Deserialize, Serialize};
+use time::format_description::{self, OwnedFormatItem};
 
 /// The main configuration struct. See the `Default` impl for default values.
 #[derive(Debug, Serialize, Deserialize)]
@@ -26,6 +27,9 @@ pub struct Config {
     /// currently used to prevent clobbering files with the same name.
     /// Refer to [the format-string specification in the time-rs crate](https://time-rs.github.io/book/api/format-description.html).
     pub timestampformat: String,
+
+    #[serde(skip)]
+    pub timestampformat_parsed: Option<OwnedFormatItem>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -65,6 +69,7 @@ impl Default for Config {
             timestampformat: String::from(
                 "[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:2][offset_hour]:[offset_minute]",
             ),
+            timestampformat_parsed: None,
         }
     }
 }
@@ -75,10 +80,20 @@ impl Config {
 
         let with_env = default.clone().merge(Env::prefixed("TYP_").split("_"));
 
-        with_env.extract::<Config>().unwrap_or_else(|e| {
+        let mut full = with_env.extract::<Config>().unwrap_or_else(|e| {
             // TODO: logger is not yet initialised; find way to warn that init failed.
-            log::warn!("Failed to load config: {e}; using defaults.");
+            log::error!("Failed to load config: {e}; using defaults.");
             default.extract::<Config>().unwrap()
-        })
+        });
+
+        // HACK to initialise parsed timestamp format, because `OwnedFormatItem` is not serialisable
+        full.timestampformat_parsed = format_description::parse_owned::<2>(&full.timestampformat)
+            .or_else(|e| {
+                log::error!("Failed to parse timestamp format string: {e}; using default");
+                format_description::parse_owned::<2>(&Config::default().timestampformat)
+            })
+            .ok();
+
+        full
     }
 }
