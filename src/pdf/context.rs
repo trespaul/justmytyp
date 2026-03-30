@@ -53,7 +53,6 @@ impl typst::World for Context<'_> {
     // the current date for Typst's `#datetime`;
     // if no offset from UTC is given, return local time;
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
-        // TODO: no offset should local datetime; UTC offsets are not always whole hours
         let offset = offset.unwrap_or(0);
         let offset = time::UtcOffset::from_hms(offset.try_into().ok()?, 0, 0).ok()?;
         let time = time::UtcDateTime::now().checked_to_offset(offset)?;
