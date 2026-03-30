@@ -10,12 +10,10 @@ pub async fn upload(config: &S3Config, filename: &str, body: Vec<u8>) -> Result<
         credentials,
     } = config;
 
-    let client = Client::builder(url)
-        .unwrap()
+    let client = Client::builder(url)?
         .region(region)
         .auth(Auth::Static(credentials.clone()))
-        .build()
-        .unwrap();
+        .build()?;
 
     client
         .objects()

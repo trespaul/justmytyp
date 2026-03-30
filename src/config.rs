@@ -82,7 +82,7 @@ impl Config {
 
         let mut full = with_env.extract::<Config>().unwrap_or_else(|e| {
             log::error!("Failed to load config: {e}; using defaults.");
-            default.extract::<Config>().unwrap()
+            default.extract::<Config>().expect("BUG: default config failed to extract.")
         });
 
         // HACK to initialise parsed timestamp format, because `OwnedFormatItem` is not serialisable

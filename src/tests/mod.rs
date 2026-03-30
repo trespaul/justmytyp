@@ -8,7 +8,7 @@ fn test_request_deserialization() {
             "input": { "bat": "baz" }
         }"#;
 
-    let deserialized: RequestMessage = serde_json::from_str(test).unwrap();
+    let deserialized: RequestMessage = serde_json::from_str(test).expect("Malformed test data.");
     let raw_string: &str = deserialized.input.get();
 
     assert_eq!(raw_string, "{ \"bat\": \"baz\" }");

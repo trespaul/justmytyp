@@ -43,7 +43,7 @@ impl typst::World for Context<'_> {
 
     // try to access the specified file
     fn file(&self, id: FileId) -> FileResult<Bytes> {
-        if id.vpath().as_rooted_path().to_str().unwrap() == "/input.json" {
+        if id.vpath().as_rooted_path().to_str() == Some("/input.json") {
             Ok(Bytes::from_string(self.input.clone()))
         } else {
             self.world.get_file(id).map(|file| file.bytes.clone())

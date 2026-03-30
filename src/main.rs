@@ -65,7 +65,7 @@ async fn main() {
             axum::serve(r, app)
                 .with_graceful_shutdown(shutdown_signal())
                 .await
-                .unwrap();
+                .expect("BUG: server should always wait for graceful shutdown.");
         }
         Err(e) => {
             log::error!(
@@ -198,7 +198,9 @@ fn make_filename(name: &str, state: &Arc<AppState>) -> String {
 
     let now = time::UtcDateTime::now();
 
-    let timestamp = now.format(timestampformat).unwrap();
+    let timestamp = now
+        .format(timestampformat)
+        .expect("BUG: timestamp parsed, but formatting timestamp failed.");
 
     format!("{timestamp}-{name}.pdf")
 }
