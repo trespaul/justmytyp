@@ -4,9 +4,10 @@ use figment::{
     Figment,
     providers::{Env, Serialized},
 };
+use s3::Credentials;
 use serde::{Deserialize, Serialize};
 
-/// The main configuration struct. See the impl for Default for default values.
+/// The main configuration struct. See the `Default` impl for default values.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     /// One of ERROR, WARN, INFO, DEBUG, TRACE.
@@ -32,8 +33,24 @@ pub struct S3Config {
     pub url: String,
     pub bucket: String,
     pub region: String,
-    pub key: String,
-    pub secret: String,
+
+    #[serde(with = "CredentialsDef")]
+    pub credentials: Credentials,
+}
+
+/// This dummy struct is copied from s3 in order to add ser/de.
+#[derive(Serialize, Deserialize)]
+#[serde(remote = "Credentials")]
+pub struct CredentialsDef {
+    /// Access key identifier. Use `KEY`.
+    #[serde(rename = "key")]
+    pub access_key_id: String,
+    /// Secret access key. Use `SECRET`.
+    #[serde(rename = "secret")]
+    pub secret_access_key: String,
+    /// Optional session token for temporary credentials. Use `SESSION`
+    #[serde(rename = "session")]
+    pub session_token: Option<String>,
 }
 
 impl Default for Config {
@@ -59,6 +76,7 @@ impl Config {
         let with_env = default.clone().merge(Env::prefixed("TYP_").split("_"));
 
         with_env.extract::<Config>().unwrap_or_else(|e| {
+            // TODO: logger is not yet initialised; find way to warn that init failed.
             log::warn!("Failed to load config: {e}; using defaults.");
             default.extract::<Config>().unwrap()
         })

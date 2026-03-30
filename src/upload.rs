@@ -1,4 +1,4 @@
-use s3::{Auth, Client, Credentials};
+use s3::{Auth, Client};
 
 use crate::config::S3Config;
 
@@ -7,15 +7,13 @@ pub async fn upload(config: &S3Config, filename: &str, body: Vec<u8>) -> Result<
         url,
         bucket,
         region,
-        key,
-        secret,
+        credentials,
     } = config;
 
     let client = Client::builder(url)
         .unwrap()
         .region(region)
-        .auth(Auth::Static(Credentials::new(key, secret).unwrap()))
-        // TODO: build credentials (and check?) when loading config so panic happens on startup
+        .auth(Auth::Static(credentials.clone()))
         .build()
         .unwrap();
 
@@ -29,21 +27,29 @@ pub async fn upload(config: &S3Config, filename: &str, body: Vec<u8>) -> Result<
         .map(|_| format!("{url}/{filename}"))
 }
 
+// TODO: add upload integration test; this requires running garage instance.
 /*
-// TODO: add back upload test.
 #[tokio::test]
 async fn test_upload() {
-    let _ = upload(
-        &S3Config {
-            url: "http://localhost:3900".into(),
-            bucket: "test".into(),
-            region: "garage".into(),
-            key: "GKf50f4b4e49d26d3fa94b1e53".into(),
-            secret: "ea61d254f42cd1a14f75fdc44dee3f9740cb02bedd2a08061f29c52a7f95531c".into(),
-        },
-        "test",
-        vec![0, 1, 2, 3],
-    )
-    .await;
+    assert!(
+        upload(
+            &S3Config {
+                url: "http://localhost:3900".into(),
+                bucket: "test".into(),
+                region: "garage".into(),
+                credentials: s3::Credentials {
+                    access_key_id: "GKf50f4b4e49d26d3fa94b1e53".to_string(),
+                    secret_access_key:
+                        "ea61d254f42cd1a14f75fdc44dee3f9740cb02bedd2a08061f29c52a7f95531c"
+                            .to_string(),
+                    session_token: None,
+                },
+            },
+            "test",
+            vec![0, 1, 2, 3],
+        )
+        .await
+        .is_ok()
+    );
 }
 */
