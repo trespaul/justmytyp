@@ -30,14 +30,16 @@ struct AppState {
 
 #[tokio::main]
 async fn main() {
+    env_logger::Builder::new()
+        .filter_level(Config::default().loglevel)
+        .init();
+
     let config = Config::init();
     let world = World::new(config.rootdir.clone(), config.cachedir.clone());
 
     let state = Arc::new(AppState { config, world });
 
-    env_logger::Builder::new()
-        .filter_level(state.config.loglevel)
-        .init();
+    log::set_max_level(state.config.loglevel);
 
     log::debug!("Loaded config: {:#?}", state.config);
 

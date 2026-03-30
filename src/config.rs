@@ -81,7 +81,6 @@ impl Config {
         let with_env = default.clone().merge(Env::prefixed("TYP_").split("_"));
 
         let mut full = with_env.extract::<Config>().unwrap_or_else(|e| {
-            // TODO: logger is not yet initialised; find way to warn that init failed.
             log::error!("Failed to load config: {e}; using defaults.");
             default.extract::<Config>().unwrap()
         });
